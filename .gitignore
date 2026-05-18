@@ -1,0 +1,8 @@
+browser/
+media/
+logs/
+openclaw.json.bak
+**/node_modules/
+agents/*/sessions/*.jsonl
+agents/*/sessions/sessions.json
+update-check.json
