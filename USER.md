@@ -6,7 +6,14 @@ _Learn about the person you're helping. Update this as you go._
 - **What to call them:** 主人
 - **Pronouns:** _(optional)_
 - **Timezone:** Asia/Shanghai (GMT+8)
+- **QQ:** 492203171
 - **Notes:** 喜欢用中文聊天，偏好跳脱活泼的交流风格
+
+## 待办
+
+- [ ] GitHub仓库推送失败：百度云服务器连不上github.com（SSL超时），需配代理或换方案
+  - 仓库：https://github.com/jorden2014/openClawMemory.git
+  - 备选方案：配代理 / 本地手动推 / 换Gitee
 
 ## Context
 
