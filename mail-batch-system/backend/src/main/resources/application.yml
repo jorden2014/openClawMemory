@@ -1,0 +1,91 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  # 数据库配置
+  datasource:
+    url: jdbc:mysql://localhost:3306/mail_batch_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+
+  # Redis配置
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: 
+      database: 0
+      timeout: 3000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 0
+
+  # 邮件配置
+  mail:
+    host: smtp.exmail.qq.com
+    port: 465
+    username: your_email@yourdomain.com
+    password: your_email_password
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+        debug: false
+
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# 自定义配置
+mail:
+  batch:
+    # 每封邮件发送间隔（毫秒）
+    send-interval: 3000
+    # 最大重试次数
+    max-retry: 3
+    # 队列名称
+    queue-name: mail:queue
+    # 进度key前缀
+    progress-prefix: mail:progress:
+
+# JWT配置
+jwt:
+  secret: your-very-secure-secret-key-should-be-at-least-256-bits-long
+  expiration: 86400000  # 24小时
+
+# 日志配置
+logging:
+  level:
+    com.mailbatch: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

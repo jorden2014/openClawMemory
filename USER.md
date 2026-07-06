@@ -1,0 +1,23 @@
+# USER.md - About Your Human
+
+_Learn about the person you're helping. Update this as you go._
+
+- **Name:** 主人
+- **What to call them:** 主人
+- **Pronouns:** _(optional)_
+- **Timezone:** Asia/Shanghai (GMT+8)
+- **QQ:** 492203171
+- **Notes:** 喜欢用中文聊天，偏好跳脱活泼的交流风格
+
+## 待办
+
+- [x] ~~GitHub仓库推送失败：百度云服务器连不上github.com（SSL超时），需配代理或换方案~~ ✅ 2026-05-18 网络恢复，推送成功
+  - 仓库：https://github.com/jorden2014/openClawMemory.git
+
+## Context
+
+_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
+
+---
+
+The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
