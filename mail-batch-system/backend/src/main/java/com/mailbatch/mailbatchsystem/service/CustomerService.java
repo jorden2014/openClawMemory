@@ -19,7 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -201,24 +205,155 @@ public class CustomerService {
     }
 
     /**
-     * 从Excel导入客户
+     * 从Excel/CSV导入客户
      */
     @Transactional
     public int importFromExcel(MultipartFile file) throws IOException {
-        log.info("从Excel导入客户: {}", file.getOriginalFilename());
+        log.info("从Excel/CSV导入客户: {}", file.getOriginalFilename());
         
+        // 判断文件真实类型（不是只看扩展名）
+        String filename = file.getOriginalFilename();
+        boolean isExcel = filename != null && filename.toLowerCase().endsWith(".xlsx");
+        
+        // 检查文件内容是否是 Zip（Excel 格式）
+        try (InputStream is = file.getInputStream()) {
+            int firstByte = is.read();
+            if (firstByte == 'P' ) { // Zip 文件开头是 'PK' (0x50 0x4B)
+                int secondByte = is.read();
+                if (secondByte == 'K') {
+                    isExcel = true;
+                    log.info("检测到 Zip 格式（Excel）");
+                }
+            }
+        }
+        
+        if (isExcel) {
+            return importFromExcelInternal(file);
+        } else {
+            return importFromCsv(file);
+        }
+    }
+
+    /**
+     * 从CSV导入客户
+     */
+    private int importFromCsv(MultipartFile file) throws IOException {
+        log.info("CSV文件，使用CSV解析器");
+        int count = 0;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            boolean firstLine = true;
+            while ((line = reader.readLine()) != null) {
+                if (firstLine) {
+                    firstLine = false;
+                    continue; // 跳过表头
+                }
+                String[] parts = line.split(",");
+                if (parts.length < 3) continue;
+                
+                String name = parts[0].trim();
+                String salutation = parts.length > 1 ? parts[1].trim() : "";
+                String email = parts[2].trim();
+                
+                if (name.isEmpty() || email.isEmpty()) continue;
+                
+                if (customerRepository.existsByEmail(email)) {
+                    log.warn("邮箱已存在，跳过: {}", email);
+                    continue;
+                }
+                
+                Customer customer = Customer.builder()
+                        .name(name)
+                        .salutation(salutation)
+                        .email(email)
+                        .tags(parts.length > 3 ? parts[3].trim() : "")
+                        .remark(parts.length > 4 ? parts[4].trim() : "")
+                        .build();
+                
+                customerRepository.save(customer);
+                count++;
+            }
+        }
+        log.info("成功导入{}条客户数据", count);
+        return count;
+    }
+
+    /**
+     * 从Excel导入客户（内部方法）
+     */
+    private int importFromExcelInternal(MultipartFile file) throws IOException {
+        log.info("Excel文件，使用POI解析器");
         int count = 0;
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             
-            // 跳过表头行
-            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+            // 找到真正的表头行（包含"姓名"或"邮箱"的行）
+            int headerRowIndex = -1;
+            int nameColIndex = 1;
+            int emailColIndex = 3;
+            
+            for (int i = 0; i <= Math.min(20, sheet.getLastRowNum()); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) {
+                    log.warn("行{}为空", i);
+                    continue;
+                }
+                for (Cell cell : row) {
+                    String value = getCellValue(cell);
+                    if (!value.isEmpty()) {
+                        String displayValue = value.length() > 50 ? value.substring(0,50) + "..." : value;
+                        log.error("行{} 列{}: [{}]", i, cell.getColumnIndex(), displayValue);
+                    }
+                    if (value.contains("姓名")) {
+                        headerRowIndex = i;
+                        nameColIndex = cell.getColumnIndex();
+                        log.info("找到姓名列: 行{}=列{}", i, nameColIndex);
+                    }
+                    if (value.contains("邮箱")) {
+                        emailColIndex = cell.getColumnIndex();
+                        log.info("找到邮箱列: 行{}=列{}", i, emailColIndex);
+                    }
+                }
+                if (headerRowIndex >= 0) break;
+            }
+            
+            if (headerRowIndex < 0) {
+                log.warn("未找到表头行（包含'姓名'或'邮箱'）");
+                return 0;
+            }
+            
+            log.info("找到表头行: 第{}行, nameColIndex={}, emailColIndex={}", headerRowIndex + 1, nameColIndex, emailColIndex);
+            
+            // 从表头行的下一行开始读取数据
+            for (int i = headerRowIndex + 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
                 
                 try {
-                    String name = getCellValue(row.getCell(1));  // 姓名
-                    String email = getCellValue(row.getCell(3)); // 邮箱
+                    // 动态获取列值（根据表头位置）
+                    String name = "";
+                    String salutation = "";
+                    String email = "";
+                    String tags = "";
+                    String remark = "";
+                    
+                    // 遍历当前行的所有单元格
+                    for (Cell cell : row) {
+                        int colIndex = cell.getColumnIndex();
+                        String value = getCellValue(cell);
+                        
+                        if (colIndex == nameColIndex) {
+                            name = value;
+                        } else if (colIndex == nameColIndex + 1) {
+                            salutation = value;  // 称呼在姓名后1列
+                        } else if (colIndex == emailColIndex) {
+                            email = value;
+                        } else if (colIndex == emailColIndex + 1) {
+                            tags = value;  // 标签在邮箱后1列
+                        } else if (colIndex == emailColIndex + 2) {
+                            remark = value;  // 备注在邮箱后2列
+                        }
+                    }
                     
                     if (name.isEmpty() || email.isEmpty()) continue;
                     
@@ -228,15 +363,16 @@ public class CustomerService {
                         continue;
                     }
                     
-                    Customer customer = Customer.builder()
+                    Customer newCustomer = Customer.builder()
                             .name(name)
-                            .salutation(getCellValue(row.getCell(2)))
+                            .salutation(salutation)
                             .email(email)
-                            .tags(getCellValue(row.getCell(4)))
-                            .remark(getCellValue(row.getCell(5)))
+                            .tags(tags)
+                            .remark(remark)
                             .build();
                     
-                    customerRepository.save(customer);
+                    log.info("准备插入: name=[{}] email=[{}] salutation=[{}]", name, email, salutation);
+                    customerRepository.save(newCustomer);
                     count++;
                 } catch (Exception e) {
                     log.error("导入第{}行失败: {}", i + 1, e.getMessage());
@@ -271,15 +407,15 @@ public class CustomerService {
     }
 
     /**
-     * 获取单元格值
+     * 获取单元格值（正确处理所有类型，包括富文本）
      */
     private String getCellValue(Cell cell) {
         if (cell == null) return "";
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue().trim();
-            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
-            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
-            default -> "";
-        };
+        org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
+        String value = formatter.formatCellValue(cell).trim();
+        if (value.length() > 100) {
+            log.warn("单元格值超长（前100字符）: {}", value.substring(0, Math.min(100, value.length())));
+        }
+        return value;
     }
 }
