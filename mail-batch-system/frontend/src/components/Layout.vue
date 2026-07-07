@@ -34,7 +34,7 @@
           <el-icon><List /></el-icon>
           <template #title>发送记录</template>
         </el-menu-item>
-        <el-menu-item v-if="userStore.isAdmin()" index="/settings">
+        <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>系统设置</template>
         </el-menu-item>

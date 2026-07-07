@@ -1,6 +1,6 @@
 <template>
   <div style="max-width: 400px; margin: 100px auto; padding: 20px; border: 1px solid #dcdfe6; border-radius: 8px;">
-    <h2 style="text-align: center; margin-bottom: 30px;">邮件批量发送系统</h2>
+    <h2 style="text-align: center; margin-bottom: 30px;">Ellen专属邮件发送系统</h2>
     <div style="margin-bottom: 20px;">
       <label style="display: block; margin-bottom: 8px;">用户名</label>
       <input 

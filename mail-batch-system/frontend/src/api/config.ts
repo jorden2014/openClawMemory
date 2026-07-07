@@ -1,22 +1,14 @@
 import request from '../utils/request'
-import type { Result, SmtpConfig, SendParams } from '../utils/types'
+import type { Result } from '../utils/types'
 
-// 获取 SMTP 配置
-export function getSmtpConfig() {
-  return request.get<any, Result<SmtpConfig>>('/config/smtp')
+export function getMailConfig() {
+  return request.get<any, Result<Map<string, any>>>('/config/mail')
 }
 
-// 更新 SMTP 配置
-export function updateSmtpConfig(data: SmtpConfig) {
-  return request.put<any, Result<void>>('/config/smtp', data)
+export function updateMailConfig(data: any) {
+  return request.post<any, Result<null>>('/config/mail', data)
 }
 
-// 获取发送参数
-export function getSendParams() {
-  return request.get<any, Result<SendParams>>('/config/send-params')
-}
-
-// 更新发送参数
-export function updateSendParams(data: SendParams) {
-  return request.put<any, Result<void>>('/config/send-params', data)
+export function testMailConfig(data: any) {
+  return request.post<any, Result<null>>('/config/mail/test', data)
 }
