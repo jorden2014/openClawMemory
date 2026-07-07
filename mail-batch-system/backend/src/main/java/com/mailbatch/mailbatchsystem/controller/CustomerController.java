@@ -97,7 +97,6 @@ public class CustomerController {
     /**
      * 从Excel导入客户
      * POST /api/customers/import
-     * 注意：此接口必须放在 /{id} 之前
      */
     @PostMapping("/import")
     public Result<?> importCustomers(@RequestParam("file") MultipartFile file) {
@@ -108,8 +107,13 @@ public class CustomerController {
         }
 
         try {
+            // 返回包含成功/失败条数的对象
             int count = customerService.importFromExcel(file);
-            return Result.success("成功导入 " + count + " 条客户数据");
+            java.util.Map<String, Object> data = new java.util.HashMap<>();
+            data.put("success", count);
+            data.put("failed", 0); // TODO: 实现失败计数
+            data.put("errors", new java.util.ArrayList<String>());
+            return Result.success("导入完成", data);
         } catch (IOException e) {
             log.error("导入失败: {}", e.getMessage(), e);
             return Result.error("导入失败: " + e.getMessage());
