@@ -42,14 +42,20 @@ public class DatabaseInitializer {
                 return;
             }
 
-            // 执行初始化SQL脚本
-            Resource resource = new ClassPathResource("schema.sql");
-            if (resource.exists()) {
-                log.info("执行数据库初始化脚本: schema.sql");
-                ScriptUtils.executeSqlScript(connection, resource);
-                log.info("数据库初始化完成");
-            } else {
-                log.warn("未找到数据库初始化脚本: schema.sql");
+            // 跳过 SQL 脚本执行（手动初始化）
+            log.info("跳过 schema.sql 执行，使用 Hibernate 自动建表");
+            
+            // 确保 admin 用户存在
+            var checkAdmin = connection.createStatement();
+            var adminResult = checkAdmin.executeQuery("SELECT COUNT(*) FROM users WHERE username = 'admin'");
+            adminResult.next();
+            if (adminResult.getInt(1) == 0) {
+                // 创建 admin 用户（密码: admin123）
+                var createAdmin = connection.createStatement();
+                // BCrypt hash for 'admin123'
+                String adminPassword = "$2a$10$DmG.AxJ4sy5BD.b2V6cIIu8fLrk44/hH.lEDye5p9hEOeSjz2B5p2";
+                createAdmin.executeUpdate("INSERT INTO users (username, password, role) VALUES ('admin', '" + adminPassword + "', 'ADMIN')");
+                log.info("创建 admin 用户完成");
             }
 
         } catch (SQLException e) {

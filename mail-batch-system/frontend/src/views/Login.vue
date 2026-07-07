@@ -1,69 +1,81 @@
 <template>
-  <div class="login-container">
-    <el-card class="login-card" shadow="hover">
-      <template #header>
-        <div style="text-align: center; font-size: 22px; font-weight: bold">📧 邮件批量发送系统</div>
-      </template>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="0" size="large">
-        <el-form-item prop="username">
-          <el-input v-model="form.username" placeholder="用户名" prefix-icon="User" />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input v-model="form.password" type="password" placeholder="密码" prefix-icon="Lock" show-password @keyup.enter="handleLogin" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" style="width: 100%" @click="handleLogin">登 录</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+  <div style="max-width: 400px; margin: 100px auto; padding: 20px; border: 1px solid #dcdfe6; border-radius: 8px;">
+    <h2 style="text-align: center; margin-bottom: 30px;">邮件批量发送系统</h2>
+    <div style="margin-bottom: 20px;">
+      <label style="display: block; margin-bottom: 8px;">用户名</label>
+      <input 
+        v-model="form.username" 
+        placeholder="请输入用户名" 
+        style="width: 100%; padding: 8px; border: 1px solid #dcdfe6; border-radius: 4px;"
+      />
+    </div>
+    <div style="margin-bottom: 20px;">
+      <label style="display: block; margin-bottom: 8px;">密码</label>
+      <input 
+        type="password" 
+        v-model="form.password" 
+        placeholder="请输入密码" 
+        style="width: 100%; padding: 8px; border: 1px solid #dcdfe6; border-radius: 4px;"
+        @keyup.enter="handleLogin"
+      />
+    </div>
+    <el-button 
+      type="primary" 
+      :loading="loading" 
+      style="width: 100%" 
+      @click="handleLogin"
+    >
+      登 录
+    </el-button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import type { FormInstance } from 'element-plus'
-import { login } from '../api/auth'
-import { useUserStore } from '../stores/user'
+import { reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { login } from '../api/auth';
+import { useUserStore } from '../stores/user';
 
-const router = useRouter()
-const userStore = useUserStore()
-const formRef = ref<FormInstance>()
-const loading = ref(false)
+const router = useRouter();
+const userStore = useUserStore();
+const loading = ref(false);
 
-const form = reactive({ username: '', password: '' })
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-}
+const form = reactive({
+  username: '',
+  password: '',
+});
 
 async function handleLogin() {
-  await formRef.value?.validate()
-  loading.value = true
+  if (!form.username || !form.password) {
+    ElMessage.warning('请输入用户名和密码');
+    return;
+  }
+
+  loading.value = true;
   try {
-    const res = await login(form)
-    userStore.setLogin(res.data)
-    ElMessage.success('登录成功')
-    router.push('/dashboard')
-  } catch {
-    // 错误已在拦截器中处理
+    // 调用登录接口（Session 认证）
+    const res = await login({
+      username: form.username,
+      password: form.password,
+    });
+
+    // 登录成功，存储用户信息（不需要存 Token）
+    userStore.setUser({
+      id: res.data.userId,
+      username: res.data.username,
+      role: res.data.role,
+    });
+
+    // Session 认证：浏览器会自动保存 JSESSIONID Cookie
+    ElMessage.success('登录成功');
+    
+    // 跳转到首页
+    router.push('/');
+  } catch (error: any) {
+    ElMessage.error(error.message || '登录失败');
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 </script>
-
-<style scoped>
-.login-container {
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-.login-card {
-  width: 400px;
-  border-radius: 12px;
-}
-</style>

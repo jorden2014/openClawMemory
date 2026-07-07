@@ -369,6 +369,9 @@ public class MailSendService {
      */
     public Map<String, Object> getProgress(String batchId) {
         String key = progressPrefix + batchId;
-        return redisTemplate.opsForHash().entries(key);
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
+        Map<String, Object> result = new java.util.HashMap<>();
+        entries.forEach((k, v) -> result.put(String.valueOf(k), v));
+        return result;
     }
 }

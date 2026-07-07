@@ -2,6 +2,7 @@ package com.mailbatch.mailbatchsystem.controller;
 
 import com.mailbatch.mailbatchsystem.dto.LoginRequest;
 import com.mailbatch.mailbatchsystem.dto.LoginResponse;
+import com.mailbatch.mailbatchsystem.dto.RegisterRequest;
 import com.mailbatch.mailbatchsystem.dto.Result;
 import com.mailbatch.mailbatchsystem.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -46,12 +47,11 @@ public class AuthController {
      * POST /api/auth/register
      */
     @PostMapping("/register")
-    public Result<?> register(@RequestParam String username, 
-                             @RequestParam String password) {
-        log.info("收到注册请求: {}", username);
+    public Result<?> register(@Validated @RequestBody RegisterRequest registerRequest) {
+        log.info("收到注册请求: {}", registerRequest.getUsername());
 
         try {
-            userService.register(username, password);
+            userService.register(registerRequest.getUsername(), registerRequest.getPassword());
             return Result.success("注册成功");
         } catch (Exception e) {
             log.error("注册失败: {}", e.getMessage());

@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/mail/'),
   routes: [
     {
       path: '/login',
@@ -56,10 +56,10 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach((to, _from, next) => {
-  const token = localStorage.getItem('token')
-  if (to.path !== '/login' && !token) {
+  const user = localStorage.getItem('user')
+  if (to.path !== '/login' && !user) {
     next('/login')
-  } else if (to.path === '/login' && token) {
+  } else if (to.path === '/login' && user) {
     next('/dashboard')
   } else {
     next()

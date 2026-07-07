@@ -27,7 +27,7 @@ public class TemplateController {
      * POST /api/templates
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<TemplateResponse> createTemplate(@Validated @RequestBody TemplateRequest request) {
         log.info("创建邮件模板: {}", request.getName());
         TemplateResponse response = templateService.createTemplate(request);
@@ -39,7 +39,7 @@ public class TemplateController {
      * PUT /api/templates/{id}
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<TemplateResponse> updateTemplate(
             @PathVariable Long id,
             @Validated @RequestBody TemplateRequest request) {
@@ -53,7 +53,7 @@ public class TemplateController {
      * DELETE /api/templates/{id}
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    // @PreAuthorize("hasRole('ADMIN')")
     public Result<?> deleteTemplate(@PathVariable Long id) {
         log.info("删除邮件模板: id={}", id);
         templateService.deleteTemplate(id);
@@ -65,7 +65,7 @@ public class TemplateController {
      * GET /api/templates/{id}
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<TemplateResponse> getTemplate(@PathVariable Long id) {
         log.info("查询模板详情: id={}", id);
         TemplateResponse response = templateService.getTemplate(id);
@@ -77,7 +77,7 @@ public class TemplateController {
      * GET /api/templates?keyword=xxx&page=0&size=10
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<PageResponse<TemplateResponse>> listTemplates(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
@@ -96,7 +96,7 @@ public class TemplateController {
      * GET /api/templates/all
      */
     @GetMapping("/all")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<?> getAllTemplates() {
         return Result.success(templateService.getAllTemplates());
     }

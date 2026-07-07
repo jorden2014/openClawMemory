@@ -1,5 +1,7 @@
 package com.mailbatch.mailbatchsystem.service;
 
+import com.mailbatch.mailbatchsystem.dto.PageResponse;
+
 import com.mailbatch.mailbatchsystem.dto.TemplateRequest;
 import com.mailbatch.mailbatchsystem.dto.TemplateResponse;
 import com.mailbatch.mailbatchsystem.entity.MailTemplate;

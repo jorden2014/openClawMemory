@@ -1,5 +1,7 @@
 package com.mailbatch.mailbatchsystem.service;
 
+import com.mailbatch.mailbatchsystem.dto.PageResponse;
+
 import com.mailbatch.mailbatchsystem.dto.CustomerRequest;
 import com.mailbatch.mailbatchsystem.dto.CustomerResponse;
 import com.mailbatch.mailbatchsystem.entity.Customer;
@@ -244,6 +246,28 @@ public class CustomerService {
         
         log.info("成功导入{}条客户数据", count);
         return count;
+    }
+
+    /**
+     * 获取所有标签
+     */
+    public List<String> getAllTags() {
+        log.info("获取所有标签");
+        try {
+            // 从所有客户中提取不重复的标签
+            List<Customer> customers = customerRepository.findAll();
+            return customers.stream()
+                    .map(Customer::getTags)
+                    .filter(tags -> tags != null && !tags.isEmpty())
+                    .flatMap(tags -> java.util.Arrays.stream(tags.split(",")))
+                    .map(String::trim)
+                    .filter(tag -> !tag.isEmpty())
+                    .distinct()
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.warn("获取标签失败: {}", e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     /**

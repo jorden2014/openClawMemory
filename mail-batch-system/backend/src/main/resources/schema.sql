@@ -1,8 +1,8 @@
 -- 邮件批量发送系统数据库初始化脚本
 -- 创建数据库（如果不存在）
-CREATE DATABASE IF NOT EXISTS mail_batch_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS mail_batch CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-USE mail_batch_db;
+USE mail_batch;
 
 -- 用户表
 CREATE TABLE IF NOT EXISTS users (

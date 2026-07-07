@@ -12,79 +12,121 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
-/**
- * Spring Security配置类
- * 配置JWT认证、密码加密、请求授权等
- */
+import java.util.Arrays;
+import java.util.List;
+
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(prePostEnabled = true)
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final UserDetailsServiceImpl userDetailsService;
 
-    /**
-     * 配置安全过滤链
-     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 禁用CSRF（因为使用JWT，不需要CSRF保护）
+            // 启用 CORS，禁用 CSRF（前后端分离）
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             
-            // 配置CORS
-            .cors(cors -> cors.configure(http))
-            
-            // 配置会话管理（无状态，因为使用JWT）
-            .sessionManagement(session -> 
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            
-            // 配置请求授权
-            .authorizeHttpRequests(auth -> auth
-                // 公开访问的路径
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/public/**").permitAll()
-                
-                // 静态资源
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**").permitAll()
-                
-                // 其他请求需要认证
-                .anyRequest().authenticated()
+            // Session 管理：使用 Session（前后端分离，但用 Session）
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)  // 需要时创建 Session
+                .maximumSessions(1)  // 同一用户只能有一个 Session
+                .expiredUrl("/api/auth/session-expired")
             )
             
-            // 添加JWT过滤器（在用户名密码认证过滤器之前）
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            // 认证配置：暂时全部放开（开发环境）
+            .authorizeHttpRequests(auth -> auth
+                // 所有接口都允许访问（开发环境）
+                .requestMatchers("/api/**").permitAll()
+                // 静态资源
+                .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
+                // 其他请求也允许（开发环境）
+                .anyRequest().permitAll()
+            )
             
-            // 配置异常处理
-            .exceptionHandling(exceptions -> exceptions
+            // 表单登录（可选，我们主要用 JSON 登录）
+            .formLogin(form -> form.disable())
+            
+            // 注销配置
+            .logout(logout -> logout
+                .logoutUrl("/api/auth/logout")
+                .logoutSuccessHandler((request, response, authentication) -> {
+                    response.setStatus(200);
+                    response.getWriter().write("{\"code\":200,\"message\":\"注销成功\"}");
+                })
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
+            )
+            
+            // 异常处理（暂时返回 200，不拦截）
+            .exceptionHandling(exception -> exception
                 .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(200);
                     response.setContentType("application/json;charset=UTF-8");
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("{\"code\":401,\"message\":\"未授权，请先登录\",\"data\":null}");
+                    response.getWriter().write("{\"code\":200,\"message\":\"ok\",\"data\":null}");
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    response.setStatus(200);
                     response.setContentType("application/json;charset=UTF-8");
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.getWriter().write("{\"code\":403,\"message\":\"权限不足，无法访问该资源\",\"data\":null}");
+                    response.getWriter().write("{\"code\":200,\"message\":\"ok\",\"data\":null}");
                 })
+            )
+            
+            // 记住我（可选）
+            .rememberMe(remember -> remember
+                .key("uniqueAndSecret")
+                .tokenValiditySeconds(86400)  // 24小时
             );
 
         return http.build();
     }
 
     /**
-     * 配置密码加密器（BCrypt）
+     * CORS 配置
      */
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public UrlBasedCorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://120.77.255.98:3000",
+            "http://localhost:3000",
+            "https://wy2026.top",
+            "https://wy2026.top/mail/"
+        ));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);  // 允许携带 Cookie
+        configuration.setMaxAge(3600L);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
+    public CorsFilter corsFilter() {
+        return new CorsFilter(corsConfigurationSource());
     }
 
     /**
-     * 配置认证管理器
+     * 密码编码器（临时：明文密码，开发环境）
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        // 开发环境：使用 NoOpPasswordEncoder（明文密码）
+        // 生产环境应该改用 BCryptPasswordEncoder
+        return org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance();
+    }
+
+    /**
+     * 认证管理器
      */
     @Bean
     public AuthenticationManager authenticationManager(

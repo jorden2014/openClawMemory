@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Component;
 
@@ -19,31 +21,29 @@ import java.util.stream.Collectors;
 
 /**
  * JWT工具类
- * 用于生成、解析和验证JWT Token
  */
 @Slf4j
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
-
+    // 直接从环境变量或配置文件读密钥，确保一致
+    private static final String JWT_SECRET = System.getenv("JWT_SECRET") != null 
+            ? System.getenv("JWT_SECRET") 
+            : "your-very-secure-secret-key-should-be-at-least-256-bits-long";
+    
     @Value("${jwt.expiration:86400000}")
     private long jwtExpirationInMs;
 
     private static final String AUTHORITIES_KEY = "roles";
 
     /**
-     * 生成JWT Token
-     * @param authentication Spring Security的认证对象
-     * @return JWT Token字符串
+     * 生成 JWT Token(标准方式,供 JwtAuthenticationFilter 使用)
      */
     public String generateToken(Authentication authentication) {
         User userPrincipal = (User) authentication.getPrincipal();
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
-        // 获取用户角色
         String authorities = userPrincipal.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.joining(","));
@@ -59,9 +59,21 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 从Token中获取用户名
-     * @param token JWT Token
-     * @return 用户名
+     * 为用户生成 JWT Token(供 SimpleAuthController 使用)
+     */
+    public String generateTokenForUser(com.mailbatch.mailbatchsystem.entity.User user) {
+        return Jwts.builder()
+                .id(user.getUsername())
+                .subject(user.getUsername())
+                .claim(AUTHORITIES_KEY, user.getRole().name())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationInMs))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    /**
+     * 从 Token 中获取用户名
      */
     public String getUsernameFromToken(String token) {
         Claims claims = Jwts.parser()
@@ -73,9 +85,7 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 验证Token是否有效
-     * @param token JWT Token
-     * @return 是否有效
+     * 验证 Token 是否有效
      */
     public boolean validateToken(String token) {
         try {
@@ -85,21 +95,19 @@ public class JwtTokenProvider {
                     .parseSignedClaims(token);
             return true;
         } catch (MalformedJwtException e) {
-            log.error("无效的JWT Token: {}", e.getMessage());
+            log.error("无效的 JWT Token: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
-            log.error("JWT Token已过期: {}", e.getMessage());
+            log.error("JWT Token 已过期: {}", e.getMessage());
         } catch (UnsupportedJwtException e) {
-            log.error("不支持的JWT Token: {}", e.getMessage());
+            log.error("不支持的 JWT Token: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            log.error("JWT Token为空: {}", e.getMessage());
+            log.error("JWT Token 为空: {}", e.getMessage());
         }
         return false;
     }
 
     /**
-     * 从Token中获取认证信息
-     * @param token JWT Token
-     * @return Authentication对象
+     * 从 Token 中获取认证信息
      */
     public Authentication getAuthentication(String token) {
         Claims claims = Jwts.parser()
@@ -123,6 +131,8 @@ public class JwtTokenProvider {
      * 获取签名密钥
      */
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+        // 使用固定密钥，确保生成和验证一致
+        String secret = JWT_SECRET;
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 }

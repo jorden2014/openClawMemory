@@ -1,44 +1,56 @@
-import axios from 'axios'
-import { ElMessage } from 'element-plus'
-import router from '../router'
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import { ElMessage } from 'element-plus';
+import router from '../router';
+import { useUserStore } from '../stores/user';
 
-const request = axios.create({
-  baseURL: '/api',
+// 创建 Axios 实例
+const instance: AxiosInstance = axios.create({
+  baseURL: '/mail/api',  // 所有 API 请求自动加 /mail/api 前缀
   timeout: 30000,
-})
+  withCredentials: true,
+});
 
-// 请求拦截器：自动带 JWT token
-request.interceptors.request.use(
+// 请求拦截器
+instance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 响应拦截器：统一处理错误
-request.interceptors.response.use(
-  (response) => {
-    const res = response.data
-    if (res.code && res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
-      return Promise.reject(new Error(res.message))
-    }
-    return res
+    return config;
   },
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      router.push('/login')
-      ElMessage.warning('登录已过期，请重新登录')
-    } else {
-      ElMessage.error(error.response?.data?.message || error.message || '网络错误')
-    }
-    return Promise.reject(error)
+    return Promise.reject(error);
   }
-)
+);
 
-export default request
+// 响应拦截器
+instance.interceptors.response.use(
+  (response: AxiosResponse) => {
+    return response.data;
+  },
+  (error) => {
+    if (error.response) {
+      const { status, data } = error.response;
+      
+      if (status === 401) {
+        const userStore = useUserStore();
+        userStore.logout();
+        if (router.currentRoute.value.path !== '/login') {
+          router.push('/login');
+        }
+        return Promise.reject(new Error(data?.message || '未授权，请先登录'));
+      }
+      
+      if (status === 403) {
+        ElMessage.error(data?.message || '权限不足');
+        return Promise.reject(new Error(data?.message || '权限不足'));
+      }
+      
+      const message = data?.message || `请求错误: ${status}`;
+      ElMessage.error(message);
+      return Promise.reject(new Error(message));
+    }
+    
+    ElMessage.error('网络错误，请检查网络连接');
+    return Promise.reject(new Error('网络错误'));
+  }
+);
+
+export default instance;

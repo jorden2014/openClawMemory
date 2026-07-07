@@ -1,0 +1,29 @@
+# 后端忽略文件
+backend/target/
+backend/.mvn/
+backend/.gradle/
+backend/*.log
+backend/.classpath
+backend/.project
+backend/.settings/
+
+# 前端忽略文件
+frontend/node_modules/
+frontend/dist/
+frontend/.idea/
+frontend/*.log
+
+# IDE
+*.iml
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.temp

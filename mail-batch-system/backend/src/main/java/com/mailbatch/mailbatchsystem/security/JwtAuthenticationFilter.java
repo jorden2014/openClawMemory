@@ -16,7 +16,6 @@ import java.io.IOException;
 
 /**
  * JWT认证过滤器
- * 从请求头中提取Token并进行认证
  */
 @Slf4j
 @Component
@@ -36,6 +35,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 提取Token
         String token = resolveToken(request);
         
+        log.debug("收到请求：{}，Authorization 头：{}", request.getRequestURI(), 
+             request.getHeader(AUTHORIZATION_HEADER));
+        
         // 如果Token存在且有效，则进行认证
         if (StringUtils.hasText(token) && tokenProvider.validateToken(token)) {
             try {
@@ -46,6 +48,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 log.error("无法设置用户认证: {}", e.getMessage());
                 SecurityContextHolder.clearContext();
             }
+        } else {
+            log.debug("无有效 Token，跳过认证");
         }
         
         filterChain.doFilter(request, response);
@@ -53,8 +57,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /**
      * 从请求头中提取Token
-     * @param request HTTP请求
-     * @return Token字符串，如果不存在则返回null
      */
     private String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);

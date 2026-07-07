@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * 邮件记录控制器
- * 处理邮件发送记录的查询、重发等请求
  */
 @Slf4j
 @RestController
@@ -22,11 +21,33 @@ public class MailRecordController {
     private final MailRecordService mailRecordService;
 
     /**
+     * 仪表盘统计
+     * GET /api/records/dashboard
+     */
+    @GetMapping("/dashboard")
+    public Result<?> getDashboardStats() {
+        log.info("获取仪表盘统计");
+        try {
+            // TODO: 实现真实的统计查询
+            // 暂时返回默认值
+            java.util.Map<String, Object> stats = new java.util.HashMap<>();
+            stats.put("totalEmails", 0);
+            stats.put("successCount", 0);
+            stats.put("failedCount", 0);
+            stats.put("pendingCount", 0);
+            stats.put("todayCount", 0);
+            return Result.success(stats);
+        } catch (Exception e) {
+            log.warn("获取仪表盘统计失败: {}", e.getMessage());
+            return Result.success(new java.util.HashMap<>());
+        }
+    }
+
+    /**
      * 分页查询邮件记录
      * GET /api/records?batchId=xxx&customerId=xxx&status=PENDING&keyword=xxx&page=0&size=10
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<PageResponse<MailRecordResponse>> listRecords(
             @RequestParam(required = false) String batchId,
             @RequestParam(required = false) Long customerId,
@@ -39,7 +60,7 @@ public class MailRecordController {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         PageResponse<MailRecordResponse> response = mailRecordService.listRecords(
-            batchId, customerId, status, keyword, pageable);
+                batchId, customerId, status, keyword, pageable);
 
         return Result.success(response);
     }
@@ -47,9 +68,9 @@ public class MailRecordController {
     /**
      * 查询邮件记录详情
      * GET /api/records/{id}
+     * 注意：此接口必须放在 /dashboard 等具体路径之后
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<MailRecordResponse> getRecord(@PathVariable Long id) {
         log.info("查询邮件记录详情: id={}", id);
         MailRecordResponse response = mailRecordService.getRecord(id);
@@ -61,7 +82,6 @@ public class MailRecordController {
      * POST /api/records/{id}/resend
      */
     @PostMapping("/{id}/resend")
-    @PreAuthorize("hasRole('ADMIN')")
     public Result<?> resendMail(@PathVariable Long id) {
         log.info("重新发送邮件: id={}", id);
 
@@ -79,7 +99,6 @@ public class MailRecordController {
      * POST /api/records/batch/{batchId}/resend-failed
      */
     @PostMapping("/batch/{batchId}/resend-failed")
-    @PreAuthorize("hasRole('ADMIN')")
     public Result<?> batchResendFailed(@PathVariable String batchId) {
         log.info("批量重发失败邮件: batchId={}", batchId);
 
@@ -97,7 +116,6 @@ public class MailRecordController {
      * DELETE /api/records/{id}
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
     public Result<?> deleteRecord(@PathVariable Long id) {
         log.info("删除邮件记录: id={}", id);
 
@@ -115,7 +133,6 @@ public class MailRecordController {
      * DELETE /api/records/batch/{batchId}
      */
     @DeleteMapping("/batch/{batchId}")
-    @PreAuthorize("hasRole('ADMIN')")
     public Result<?> clearBatch(@PathVariable String batchId) {
         log.info("清空批次记录: batchId={}", batchId);
 

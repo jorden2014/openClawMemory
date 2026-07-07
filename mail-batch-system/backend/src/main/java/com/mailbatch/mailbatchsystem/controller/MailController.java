@@ -35,7 +35,7 @@ public class MailController {
      * POST /api/mail/send
      */
     @PostMapping("/send")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<String> sendMail(@RequestBody SendMailRequest request) {
         log.info("提交邮件发送任务: customerIds={}", request.getCustomerIds());
 
@@ -53,7 +53,7 @@ public class MailController {
      * GET /api/mail/progress/{batchId}
      */
     @GetMapping(value = "/progress/{batchId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public SseEmitter getProgress(@PathVariable String batchId) {
         log.info("建立SSE连接，查询发送进度: batchId={}", batchId);
 
@@ -102,7 +102,7 @@ public class MailController {
      * POST /api/mail/cancel/{batchId}
      */
     @PostMapping("/cancel/{batchId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    // @PreAuthorize("hasRole('ADMIN')")
     public Result<?> cancelSend(@PathVariable String batchId) {
         log.info("取消发送任务: batchId={}", batchId);
 
@@ -120,7 +120,7 @@ public class MailController {
      * GET /api/mail/templates
      */
     @GetMapping("/templates")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<?> getTemplates() {
         return Result.success(templateService.getAllTemplates());
     }
@@ -130,7 +130,7 @@ public class MailController {
      * GET /api/mail/batch/{batchId}/statistics
      */
     @GetMapping("/batch/{batchId}/statistics")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    // @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
     public Result<?> getBatchStatistics(@PathVariable String batchId) {
         return Result.success(mailRecordService.getBatchStatistics(batchId));
     }

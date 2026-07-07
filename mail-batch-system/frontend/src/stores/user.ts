@@ -1,31 +1,65 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { LoginResponse } from '../utils/types'
+import { defineStore } from 'pinia';
+import { reactive, computed } from 'vue';
+
+interface UserState {
+  id: number;
+  username: string;
+  role: string;
+}
 
 export const useUserStore = defineStore('user', () => {
-  const token = ref(localStorage.getItem('token') || '')
-  const username = ref(localStorage.getItem('username') || '')
-  const role = ref(localStorage.getItem('role') || '')
+  // 状态
+  const user = reactive<UserState>({
+    id: 0,
+    username: '',
+    role: '',
+  });
 
-  function setLogin(data: LoginResponse) {
-    token.value = data.token
-    username.value = data.username
-    role.value = data.role
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('username', data.username)
-    localStorage.setItem('role', data.role)
+  // 计算属性：用户名（响应式）
+  const username = computed(() => user.username);
+
+  // 判断是否是管理员
+  function isAdmin(): boolean {
+    return user.role === 'ADMIN';
   }
 
+  // 登录成功后设置用户信息
+  function setUser(userInfo: { id: number; username: string; role: string }) {
+    user.id = userInfo.id;
+    user.username = userInfo.username;
+    user.role = userInfo.role;
+    localStorage.setItem('user', JSON.stringify(user));
+  }
+
+  // 从本地存储恢复用户信息
+  function restoreUser() {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        user.id = parsed.id || 0;
+        user.username = parsed.username || '';
+        user.role = parsed.role || '';
+      } catch (e) {
+        console.error('恢复用户信息失败:', e);
+      }
+    }
+  }
+
+  // 注销
   function logout() {
-    token.value = ''
-    username.value = ''
-    role.value = ''
-    localStorage.removeItem('token')
-    localStorage.removeItem('username')
-    localStorage.removeItem('role')
+    user.id = 0;
+    user.username = '';
+    user.role = '';
+    localStorage.removeItem('user');
   }
 
-  const isAdmin = () => role.value === 'ADMIN'
-
-  return { token, username, role, setLogin, logout, isAdmin }
-})
+  return {
+    user,
+    username,
+    isAdmin,
+    setUser,
+    restoreUser,
+    logout,
+  };
+});
