@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -38,8 +39,10 @@ public class MailSendService {
     private final CustomerRepository customerRepository;
     private final MailTemplateRepository mailTemplateRepository;
     private final JavaMailSender mailSender;
+    private final MailConfigService mailConfigService;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper;
+    private final TaskExecutor mailSendExecutor;
 
     @Value("${mail.batch.queue-name:mail:queue}")
     private String queueName;
@@ -155,25 +158,43 @@ public class MailSendService {
 
         log.info("邮件发送任务提交完成: batchId={}, total={}", batchId, totalCount);
 
+        // 触发消费队列（异步执行，如果已在跑也不会重复）
+        startQueueConsumption();
+
         return batchId;
     }
 
     /**
      * 消费邮件发送队列（由定时任务或独立线程调用）
      * 逐条从Redis队列取任务发送
-     */
     @Async("mailSendExecutor")
+    /**
+     * 启动队列消费（触发 @Async 方法）
+     */
+    public void startQueueConsumption() {
+        consumeSendQueue();
+    }
+
     public void consumeSendQueue() {
         log.info("开始消费邮件发送队列...");
 
-        while (true) {
-            try {
-                // 从队列左侧取出任务（阻塞式，超时10秒）
-                Object taskObj = redisTemplate.opsForList().leftPop(queueName, 10, TimeUnit.SECONDS);
+        try {
+            String currentBatchId = null;
+            while (true) {
+                // 非阻塞取任务，避免 leftPop 超时问题
+                Object taskObj = redisTemplate.opsForList().leftPop(queueName);
 
                 if (taskObj == null) {
-                    log.info("队列为空，等待新任务...");
-                    continue;
+                    // 队列空了，再等一小段时间如果还没任务就结束
+                    Thread.sleep(2000);
+                    taskObj = redisTemplate.opsForList().leftPop(queueName);
+                    if (taskObj == null) {
+                        if (currentBatchId != null) {
+                            updateProgress(currentBatchId, "COMPLETED", 0, 0, 0, 0);
+                            log.info("批次 {} 所有任务处理完毕，标记为 COMPLETED", currentBatchId);
+                        }
+                        break;
+                    }
                 }
 
                 String taskJson = taskObj.toString();
@@ -181,58 +202,50 @@ public class MailSendService {
 
                 Long recordId = Long.valueOf(task.get("recordId").toString());
                 String batchId = task.get("batchId").toString();
+                currentBatchId = batchId;
                 String toEmail = task.get("toEmail").toString();
                 String subject = task.get("subject").toString();
                 String body = task.get("body").toString();
                 Integer retryCount = Integer.valueOf(task.get("retryCount").toString());
 
-                // 检查批次是否被取消
                 if (isBatchCancelled(batchId)) {
                     log.warn("批次已取消，跳过任务: batchId={}, recordId={}", batchId, recordId);
                     updateProgress(batchId, "CANCELLED", 0, 0, 0, 1);
                     continue;
                 }
 
-                // 更新状态为发送中
                 mailRecordRepository.updateStatus(recordId, MailRecord.Status.SENDING, null, null);
                 updateProgress(batchId, "RUNNING", 0, 1, 0, 0);
 
-                // 发送邮件
-                boolean success = sendMail(recordId, toEmail, subject, body, 
+                boolean success = sendMail(recordId, toEmail, subject, body,
                     (List<String>) task.get("attachmentPaths"), retryCount);
 
                 if (success) {
-                    // 发送成功
                     mailRecordRepository.updateStatus(recordId, MailRecord.Status.SENT, null, LocalDateTime.now());
-                    updateProgress(batchId, "RUNNING", 0, -1, 1, 0);
+                    updateProgress(batchId, "RUNNING", -1, -1, 1, 0);
                     log.info("邮件发送成功: recordId={}, toEmail={}", recordId, toEmail);
                 } else {
-                    // 发送失败，检查是否需要重试
                     if (retryCount < maxRetry) {
-                        // 重新加入队列，增加重试次数
                         task.put("retryCount", retryCount + 1);
                         String retryTaskJson = objectMapper.writeValueAsString(task);
                         redisTemplate.opsForList().rightPush(queueName, retryTaskJson);
                         log.warn("邮件发送失败，加入重试队列: recordId={}, retryCount={}", recordId, retryCount + 1);
                     } else {
-                        // 超过最大重试次数，标记为失败
                         mailRecordRepository.updateStatus(recordId, MailRecord.Status.FAILED, "超过最大重试次数", null);
-                        updateProgress(batchId, "RUNNING", 0, -1, 0, 1);
+                        updateProgress(batchId, "RUNNING", -1, -1, 0, 1);
                         log.error("邮件发送失败，超过最大重试次数: recordId={}", recordId);
                     }
                 }
 
-                // 控制发送频率
                 Thread.sleep(sendInterval);
-
-            } catch (InterruptedException e) {
-                log.warn("邮件发送线程被中断");
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                log.error("处理邮件发送任务时发生异常: {}", e.getMessage(), e);
             }
+        } catch (InterruptedException e) {
+            log.warn("邮件发送线程被中断");
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            log.error("处理邮件发送任务时发生异常: {}", e.getMessage(), e);
         }
+        log.info("邮件发送消费线程结束");
     }
 
     /**
@@ -246,6 +259,11 @@ public class MailSendService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             // 设置发件人和收件人
+            String fromEmail = mailConfigService.getUsername();
+            if (fromEmail == null || fromEmail.isEmpty()) {
+                fromEmail = "492203171@qq.com";
+            }
+            helper.setFrom(fromEmail);
             helper.setTo(toEmail);
             helper.setSubject(subject);
             helper.setText(body, true);  // true表示HTML格式

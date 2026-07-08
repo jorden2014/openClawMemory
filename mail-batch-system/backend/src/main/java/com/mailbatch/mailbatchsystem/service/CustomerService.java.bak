@@ -240,52 +240,89 @@ public class CustomerService {
     private int importFromCsv(MultipartFile file) throws IOException {
         log.info("CSV文件，使用CSV解析器");
         int count = 0;
-        // 先试 UTF-8，含乱码特征则 fallback 到 GBK
-        BufferedReader reader = null;
-        try {
-            reader = new BufferedReader(new InputStreamReader(file.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
-            reader.mark(1024);
-            String testLine = reader.readLine();
-            if (testLine != null && (testLine.contains("\uFFFD") || testLine.contains(""))) {
-                reader.close();
-                reader = new BufferedReader(new InputStreamReader(file.getInputStream(), java.nio.charset.Charset.forName("GBK")));
-                log.info("编码检测：使用 GBK");
-            } else {
-                reader.reset();
-                log.info("编码检测：UTF-8");
-            }
-        } catch (Exception e) {
-            if (reader != null) reader.close();
-            reader = new BufferedReader(new InputStreamReader(file.getInputStream(), java.nio.charset.Charset.forName("GBK")));
-            log.info("编码检测异常，fallback 到 GBK");
-        }
-        try {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(file.getInputStream(), detectCharset(file.getInputStream()))) {
             String line;
             boolean firstLine = true;
             while ((line = reader.readLine()) != null) {
-                if (firstLine) { firstLine = false; continue; }
+                // 去掉 UTF-8 BOM（文件开头的 EF BB BF）
+                if (firstLine && line.length() > 0 && line.charAt(0) == '﻿') {
+                    line = line.substring(1);
+                }
+                if (firstLine) {
+                    firstLine = false;
+                    // 验证表头
+                    if (!line.contains("邮箱") && !line.toLowerCase().contains("email")) {
+                        log.warn("CSV表头不包含邮箱列，跳过: {}", line);
+                    }
+                    continue;
+                }
                 if (line.trim().isEmpty()) continue;
+
+                // 用 CSV 规则解析（支持引号内的逗号）
                 java.util.List<String> fields = parseCsvLine(line);
-                if (fields.size() < 3) { log.warn("CSV行字段不足3列，跳过: {}", line); continue; }
+                if (fields.size() < 3) {
+                    log.warn("CSV行字段不足3列，跳过: {}", line);
+                    continue;
+                }
+
                 String name = fields.get(0).trim();
                 String salutation = fields.size() > 1 ? fields.get(1).trim() : "";
                 String email = fields.get(2).trim();
                 String tags = fields.size() > 3 ? fields.get(3).trim() : "";
                 String remark = fields.size() > 4 ? fields.get(4).trim() : "";
-                if (name.isEmpty() || email.isEmpty()) { log.warn("姓名或邮箱为空，跳过"); continue; }
-                if (customerRepository.existsByEmail(email)) { log.warn("邮箱已存在，跳过: {}", email); continue; }
-                Customer customer = Customer.builder().name(name).salutation(salutation).email(email).tags(tags).remark(remark).build();
+
+                if (name.isEmpty() || email.isEmpty()) {
+                    log.warn("姓名或邮箱为空，跳过: name={}, email={}", name, email);
+                    continue;
+                }
+
+                if (customerRepository.existsByEmail(email)) {
+                    log.warn("邮箱已存在，跳过: {}", email);
+                    continue;
+                }
+
+                Customer customer = Customer.builder()
+                        .name(name)
+                        .salutation(salutation)
+                        .email(email)
+                        .tags(tags)
+                        .remark(remark)
+                        .build();
+
                 customerRepository.save(customer);
                 count++;
+                log.debug("导入客户: name={}, email={}", name, email);
             }
-        } finally {
-            if (reader != null) reader.close();
         }
         log.info("成功导入{}条客户数据", count);
         return count;
     }
+
     /**
      * 自动检测文件编码（UTF-8 / GBK / GB2312）
+     */
+    private String detectCharset(InputStream is) throws IOException {
+        byte[] header = new byte[3];
+        int n = is.read(header);
+        is.close();
+        // UTF-8 BOM (EF BB BF)
+        if (n >= 3 && (header[0] & 0xFF) == 0xEF && (header[1] & 0xFF) == 0xBB && (header[2] & 0xFF) == 0xBF) {
+            return "UTF-8";
+        }
+        // 简单判断：尝试用 UTF-8 解码前 512 字节，失败则用 GBK
+        try {
+            byte[] buf = new byte[512];
+            java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(buf);
+            new InputStreamReader(bais, java.nio.charset.StandardCharsets.UTF_8).read();
+            return "UTF-8";
+        } catch (Exception e) {
+            return "GBK";
+        }
+    }
+
+    /**
+     * 解析一行 CSV（支持引号内的逗号）
      */
     private java.util.List<String> parseCsvLine(String line) {
         java.util.List<String> result = new java.util.ArrayList<>();
@@ -309,23 +346,6 @@ public class CustomerService {
     /**
      * 从Excel导入客户（内部方法）
      */
-
-    /**
-     * 自动检测字节数组编码（UTF-8 / GBK）
-     */
-    private String detectCharset(byte[] bytes) {
-        // UTF-8 BOM (EF BB BF)
-        if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xEF && (bytes[1] & 0xFF) == 0xBB && (bytes[2] & 0xFF) == 0xBF) {
-            return "UTF-8";
-        }
-        try {
-            new String(bytes, "UTF-8");
-            return "UTF-8";
-        } catch (Exception e) {
-            return "GBK";
-        }
-    }
-
     private int importFromExcelInternal(MultipartFile file) throws IOException {
         log.info("Excel文件，使用POI解析器");
         int count = 0;

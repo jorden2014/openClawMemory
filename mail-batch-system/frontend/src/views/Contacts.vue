@@ -16,6 +16,7 @@
         <el-col :span="14" style="text-align: right">
           <el-button type="primary" @click="showDialog()">新增客户</el-button>
           <el-button @click="showImport = true">批量导入</el-button>
+          <el-button @click="handleDownloadTemplate">下载模板</el-button>
           <el-button @click="handleExport">导出CSV</el-button>
         </el-col>
       </el-row>
@@ -166,6 +167,23 @@ async function loadTags() {
     const res = await getAllTags()
     tags.value = res.data
   } catch {}
+}
+
+// 下载模板
+async function handleDownloadTemplate() {
+  try {
+    const res = await fetch('/mail/api/customers/import-template')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '客户导入模板.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('模板下载成功')
+  } catch {
+    ElMessage.error('下载模板失败')
+  }
 }
 
 function showDialog(row?: Customer) {
