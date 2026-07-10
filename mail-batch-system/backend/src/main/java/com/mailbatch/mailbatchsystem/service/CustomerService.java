@@ -1,9 +1,8 @@
 package com.mailbatch.mailbatchsystem.service;
 
-import com.mailbatch.mailbatchsystem.dto.PageResponse;
-
 import com.mailbatch.mailbatchsystem.dto.CustomerRequest;
 import com.mailbatch.mailbatchsystem.dto.CustomerResponse;
+import com.mailbatch.mailbatchsystem.dto.PageResponse;
 import com.mailbatch.mailbatchsystem.entity.Customer;
 import com.mailbatch.mailbatchsystem.exception.BusinessException;
 import com.mailbatch.mailbatchsystem.repository.CustomerRepository;
@@ -153,6 +152,17 @@ public class CustomerService {
         Page<CustomerResponse> responsePage = page.map(CustomerResponse::fromEntity);
         
         return PageResponse.fromPage(responsePage);
+    }
+
+    public List<String> getAllTags() {
+        List<String> allTags = customerRepository.findAllTags();
+        return allTags.stream()
+                .flatMap(tags -> java.util.Arrays.stream(tags.split(",")))
+                .map(String::trim)
+                .filter(tag -> !tag.isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     /**
@@ -432,7 +442,10 @@ public class CustomerService {
     /**
      * 获取所有标签
      */
-    public List<String> getAllTags() {
+    /**
+     * 获取所有标签（带排序）
+     */
+    public List<String> getAllTagsSorted() {
         log.info("获取所有标签");
         try {
             // 从所有客户中提取不重复的标签

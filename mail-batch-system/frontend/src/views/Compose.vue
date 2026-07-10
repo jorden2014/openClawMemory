@@ -107,7 +107,8 @@
         总计 {{ progress.total }} 封 | 已发送 {{ progress.sent }} 封 | 失败 {{ progress.failed }} 封 | 待发送 {{ progress.pending }} 封
       </div>
       <template #footer>
-        <el-button type="danger" @click="handleCancel" :disabled="progress.status === 'COMPLETED' || progress.status === 'CANCELLED'">取消发送</el-button>
+        <el-button v-if="progress.status === 'COMPLETED' || progress.status === 'CANCELLED'" @click="handleClose">关闭</el-button>
+        <el-button v-else type="danger" @click="handleCancel">取消发送</el-button>
       </template>
     </el-dialog>
   </div>
@@ -137,7 +138,7 @@ const showPreview = ref(false)
 const showProgress = ref(false)
 const sending = ref(false)
 const progress = ref<SendProgress>({ batchId: '', total: 0, sent: 0, failed: 0, pending: 0, status: 'PENDING' })
-let progressTimer: ReturnType<typeof setInterval> | null = null
+let eventSource: EventSource | null = null
 
 const canSend = computed(() => selectedIds.value.length > 0 && mailSubject.value && mailBody.value)
 const progressPercent = computed(() => {
@@ -202,59 +203,109 @@ async function handleSend() {
 
   sending.value = true
   try {
-    const res = await sendMail({
+    const response = await sendMail({
       templateId: selectedTemplateId.value || undefined,
       customerIds: selectedIds.value,
       subject: mailSubject.value,
       body: mailBody.value,
     })
-    ElMessage.success('发送任务已提交')
-    showPreview.value = false
-    showProgress.value = true
-    progress.value.batchId = res.data.batchId
-    pollProgress(res.data.batchId)
-  } catch {
-    // 错误已处理
+    console.log('发送响应:', response)
+    const batchId = response.data
+    if (batchId && typeof batchId === 'string') {
+      ElMessage.success('发送任务已提交')
+      showPreview.value = false
+      showProgress.value = true
+      progress.value.batchId = batchId
+      progress.value.total = selectedIds.value.length
+      progress.value.pending = selectedIds.value.length
+      progress.value.sent = 0
+      progress.value.failed = 0
+      progress.value.status = 'SENDING'
+      connectProgressSSE(batchId)
+    } else {
+      ElMessage.error('提交失败，响应格式错误')
+    }
+  } catch (error) {
+    console.error('发送失败:', error)
+    ElMessage.error('发送失败')
   } finally {
     sending.value = false
   }
 }
 
-function pollProgress(batchId: string) {
-  progressTimer = null
-  const evtSource = new EventSource(`/api/mail/progress/${batchId}`)
-  
-  evtSource.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    if (data.code === 200 && data.data) {
-      progress.value = data.data
-      if (data.data.status === 'COMPLETED' || data.data.status === 'CANCELLED') {
-        evtSource.close()
-        if (progressTimer) clearInterval(progressTimer)
-        progressTimer = null
-        if (data.data.failed > 0) {
-          ElMessage.warning(`发送完成，${data.data.failed} 封失败`)
-        } else {
-          ElMessage.success('全部发送成功！')
+function connectProgressSSE(batchId: string) {
+  if (eventSource) {
+    eventSource.close()
+  }
+
+  eventSource = new EventSource(`/api/mail/progress/${batchId}`)
+
+  eventSource.addEventListener('progress', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      if (data.code === 200 && data.data) {
+        const p = data.data
+        progress.value = {
+          batchId: p.batchId || batchId,
+          total: p.total || progress.value.total,
+          sent: p.sent || 0,
+          failed: p.failed || 0,
+          pending: p.pending !== undefined ? p.pending : (progress.value.total - p.sent - p.failed),
+          status: p.status || 'SENDING'
         }
+        console.log('进度更新:', progress.value)
       }
+    } catch (e) {
+      console.error('解析进度数据失败:', e)
     }
-  }
-  
-  evtSource.addEventListener('complete', (event) => {
-    evtSource.close()
   })
-  
-  evtSource.onerror = (err) => {
-    console.error('SSE 连接错误:', err)
-    evtSource.close()
-  }
+
+  eventSource.addEventListener('complete', (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      ElMessage.success(data.message || '发送完成')
+    } catch (e) {
+      ElMessage.success('发送完成')
+    }
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
+  })
+
+  eventSource.addEventListener('error', (event) => {
+    console.error('SSE连接错误:', event)
+    if (eventSource) {
+      eventSource.close()
+      eventSource = null
+    }
+    ElMessage.error('进度获取失败')
+  })
+
+  eventSource.addEventListener('close', () => {
+    console.log('SSE连接关闭')
+    eventSource = null
+  })
 }
 
 async function handleCancel() {
   if (!progress.value.batchId) return
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
   await cancelSend(progress.value.batchId)
+  progress.value.status = 'CANCELLED'
   ElMessage.info('正在取消发送...')
+}
+
+function handleClose() {
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
+  showProgress.value = false
+  progress.value = { batchId: '', total: 0, sent: 0, failed: 0, pending: 0, status: 'PENDING' }
 }
 
 onMounted(() => {

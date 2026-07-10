@@ -5,6 +5,7 @@ interface UserState {
   id: number;
   username: string;
   role: string;
+  token: string;
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -13,6 +14,7 @@ export const useUserStore = defineStore('user', () => {
     id: 0,
     username: '',
     role: '',
+    token: '',
   });
 
   // 计算属性：用户名（响应式）
@@ -24,10 +26,13 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // 登录成功后设置用户信息
-  function setUser(userInfo: { id: number; username: string; role: string }) {
+  function setUser(userInfo: { id: number; username: string; role: string; token?: string }) {
     user.id = userInfo.id;
     user.username = userInfo.username;
     user.role = userInfo.role;
+    if (userInfo.token) {
+      user.token = userInfo.token;
+    }
     localStorage.setItem('user', JSON.stringify(user));
   }
 
@@ -40,6 +45,7 @@ export const useUserStore = defineStore('user', () => {
         user.id = parsed.id || 0;
         user.username = parsed.username || '';
         user.role = parsed.role || '';
+        user.token = parsed.token || '';
       } catch (e) {
         console.error('恢复用户信息失败:', e);
       }
@@ -51,6 +57,7 @@ export const useUserStore = defineStore('user', () => {
     user.id = 0;
     user.username = '';
     user.role = '';
+    user.token = '';
     localStorage.removeItem('user');
   }
 

@@ -1,5 +1,6 @@
 package com.mailbatch.mailbatchsystem.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+import org.springframework.http.HttpMethod;
 
 import java.util.Arrays;
 import java.util.List;
@@ -43,11 +45,11 @@ public class SecurityConfig {
             
             // 认证配置：暂时全部放开（开发环境）
             .authorizeHttpRequests(auth -> auth
-                // 所有接口都允许访问（开发环境）
-                .requestMatchers("/api/**").permitAll()
-                // 静态资源
-                .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
-                // 其他请求也允许（开发环境）
+                // 放行 OPTIONS 请求（CORS 预检）
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // 放行上传接口（开发环境）
+                .requestMatchers("/api/upload/**").permitAll()
+                // 所有请求都允许访问（开发环境）
                 .anyRequest().permitAll()
             )
             
@@ -83,6 +85,7 @@ public class SecurityConfig {
             .rememberMe(remember -> remember
                 .key("uniqueAndSecret")
                 .tokenValiditySeconds(86400)  // 24小时
+                .userDetailsService(userDetailsService)
             );
 
         return http.build();
@@ -96,7 +99,10 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(
             "http://120.77.255.98:3000",
+            "http://120.77.255.98:3003",
             "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:3003",
             "https://wy2026.top",
             "https://wy2026.top/mail/"
         ));

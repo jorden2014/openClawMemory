@@ -5,7 +5,7 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
-  base: '/mail/',  // 部署在 /mail/ 子路径下
+  base: '/mail/',  // 使用绝对路径，配合 Nginx 解决混合内容问题
   plugins: [
     vue(),
     AutoImport({
@@ -17,11 +17,11 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
+    host: '0.0.0.0',  // 允许外部访问
     proxy: {
-      '/mail/api': {
+      '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/mail/, ''),  // 去掉 /mail 前缀
       },
     },
   },

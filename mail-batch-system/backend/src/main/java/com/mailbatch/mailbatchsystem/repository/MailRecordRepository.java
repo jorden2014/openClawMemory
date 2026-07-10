@@ -84,4 +84,13 @@ public interface MailRecordRepository extends JpaRepository<MailRecord, Long>, J
     @Modifying
     @Query("DELETE FROM MailRecord mr WHERE mr.batchId = :batchId")
     void deleteByBatchId(@Param("batchId") String batchId);
+
+    long countByStatus(MailRecord.Status status);
+
+    long countByStatusAndSentAtBetween(MailRecord.Status status, LocalDateTime start, LocalDateTime end);
+
+    List<MailRecord> findTop10ByOrderByCreatedAtDesc();
+
+    @Query(value = "SELECT DATE(sent_at) as date, COUNT(*) as count FROM mail_records WHERE status = 'SENT' AND sent_at >= :since GROUP BY DATE(sent_at)", nativeQuery = true)
+    List<Object[]> countDailySentSince(@Param("since") LocalDateTime since);
 }

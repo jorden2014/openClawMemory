@@ -11,14 +11,8 @@ const router = createRouter({
     {
       path: '/',
       component: () => import('../components/Layout.vue'),
-      redirect: '/dashboard',
+      redirect: '/compose',
       children: [
-        {
-          path: 'dashboard',
-          name: 'Dashboard',
-          component: () => import('../views/Dashboard.vue'),
-          meta: { title: '仪表盘' },
-        },
         {
           path: 'contacts',
           name: 'Contacts',
@@ -60,7 +54,7 @@ router.beforeEach((to, _from, next) => {
   if (to.path !== '/login' && !user) {
     next('/login')
   } else if (to.path === '/login' && user) {
-    next('/dashboard')
+    next('/compose')
   } else {
     next()
   }

@@ -67,4 +67,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long>, JpaSp
     @Modifying
     @Query("DELETE FROM Customer c WHERE c.id IN :ids")
     void deleteByIds(@Param("ids") List<Long> ids);
+
+    @Query("SELECT c.tags FROM Customer c WHERE c.tags IS NOT NULL AND c.tags <> ''")
+    List<String> findAllTags();
 }

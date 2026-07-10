@@ -1,5 +1,5 @@
 import request from '../utils/request'
-import type { Result, PageResponse, MailRecord, DashboardStats } from '../utils/types'
+import type { Result, PageResponse, MailRecord } from '../utils/types'
 
 // 获取发送记录列表
 export function getRecords(params: {
@@ -22,9 +22,4 @@ export function getRecord(id: string) {
 // 重发失败邮件
 export function resendRecord(id: string) {
   return request.post<any, Result<void>>(`/records/${id}/resend`)
-}
-
-// 仪表盘统计
-export function getDashboardStats() {
-  return request.get<any, Result<DashboardStats>>('/records/dashboard')
 }

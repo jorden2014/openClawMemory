@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -19,29 +20,6 @@ import org.springframework.web.bind.annotation.*;
 public class MailRecordController {
 
     private final MailRecordService mailRecordService;
-
-    /**
-     * 仪表盘统计
-     * GET /api/records/dashboard
-     */
-    @GetMapping("/dashboard")
-    public Result<?> getDashboardStats() {
-        log.info("获取仪表盘统计");
-        try {
-            // TODO: 实现真实的统计查询
-            // 暂时返回默认值
-            java.util.Map<String, Object> stats = new java.util.HashMap<>();
-            stats.put("totalEmails", 0);
-            stats.put("successCount", 0);
-            stats.put("failedCount", 0);
-            stats.put("pendingCount", 0);
-            stats.put("todayCount", 0);
-            return Result.success(stats);
-        } catch (Exception e) {
-            log.warn("获取仪表盘统计失败: {}", e.getMessage());
-            return Result.success(new java.util.HashMap<>());
-        }
-    }
 
     /**
      * 分页查询邮件记录
@@ -63,6 +41,18 @@ public class MailRecordController {
                 batchId, customerId, status, keyword, pageable);
 
         return Result.success(response);
+    }
+
+    /**
+     * 获取仪表盘统计数据
+     * GET /api/records/dashboard
+     */
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('USER')")
+    public Result<DashboardStats> getDashboardStats() {
+        log.info("获取仪表盘统计数据");
+        DashboardStats stats = mailRecordService.getDashboardStats();
+        return Result.success(stats);
     }
 
     /**

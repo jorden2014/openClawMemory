@@ -1,18 +1,19 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import axios from 'axios';
 import { ElMessage } from 'element-plus';
 import router from '../router';
 import { useUserStore } from '../stores/user';
 
-// 创建 Axios 实例
-const instance: AxiosInstance = axios.create({
-  baseURL: '/mail/api',  // 所有 API 请求自动加 /mail/api 前缀
-  timeout: 30000,
-  withCredentials: true,
+const instance = axios.create({
+  baseURL: '/api',
+  timeout: 120000,
 });
 
-// 请求拦截器
 instance.interceptors.request.use(
   (config) => {
+    const userStore = useUserStore();
+    if (userStore.token) {
+      config.headers.Authorization = `Bearer ${userStore.token}`;
+    }
     return config;
   },
   (error) => {
@@ -20,36 +21,15 @@ instance.interceptors.request.use(
   }
 );
 
-// 响应拦截器
 instance.interceptors.response.use(
-  (response: AxiosResponse) => {
-    return response.data;
-  },
+  (response) => response.data,
   (error) => {
-    if (error.response) {
-      const { status, data } = error.response;
-      
-      if (status === 401) {
-        const userStore = useUserStore();
-        userStore.logout();
-        if (router.currentRoute.value.path !== '/login') {
-          router.push('/login');
-        }
-        return Promise.reject(new Error(data?.message || '未授权，请先登录'));
-      }
-      
-      if (status === 403) {
-        ElMessage.error(data?.message || '权限不足');
-        return Promise.reject(new Error(data?.message || '权限不足'));
-      }
-      
-      const message = data?.message || `请求错误: ${status}`;
-      ElMessage.error(message);
-      return Promise.reject(new Error(message));
+    if (error.response?.status === 401) {
+      const userStore = useUserStore();
+      userStore.logout();
+      router.push('/login');
     }
-    
-    ElMessage.error('网络错误，请检查网络连接');
-    return Promise.reject(new Error('网络错误'));
+    return Promise.reject(error);
   }
 );
 

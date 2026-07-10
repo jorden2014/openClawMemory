@@ -1,8 +1,10 @@
 package com.mailbatch.mailbatchsystem.service;
 
+import com.mailbatch.mailbatchsystem.dto.DashboardStats;
 import com.mailbatch.mailbatchsystem.dto.MailRecordResponse;
 import com.mailbatch.mailbatchsystem.dto.PageResponse;
 import com.mailbatch.mailbatchsystem.entity.MailRecord;
+import com.mailbatch.mailbatchsystem.repository.CustomerRepository;
 import com.mailbatch.mailbatchsystem.repository.MailRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,8 +14,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -26,6 +34,7 @@ import java.util.stream.Collectors;
 public class MailRecordService {
 
     private final MailRecordRepository mailRecordRepository;
+    private final CustomerRepository customerRepository;
 
     /**
      * 分页查询邮件记录（支持多条件筛选）
@@ -158,5 +167,50 @@ public class MailRecordService {
     public void clearBatch(String batchId) {
         log.info("清空批次记录: batchId={}", batchId);
         mailRecordRepository.deleteByBatchId(batchId);
+    }
+
+    /**
+     * 获取仪表盘统计数据
+     */
+    public DashboardStats getDashboardStats() {
+        DashboardStats stats = new DashboardStats();
+
+        stats.setCustomerCount(customerRepository.count());
+
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        LocalDateTime todayEnd = LocalDate.now().atTime(LocalTime.MAX);
+        stats.setTodaySentCount(mailRecordRepository.countByStatusAndSentAtBetween(MailRecord.Status.SENT, todayStart, todayEnd));
+
+        LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime monthEnd = LocalDate.now().atTime(LocalTime.MAX);
+        stats.setMonthSentCount(mailRecordRepository.countByStatusAndSentAtBetween(MailRecord.Status.SENT, monthStart, monthEnd));
+
+        stats.setFailedCount(mailRecordRepository.countByStatus(MailRecord.Status.FAILED));
+
+        List<MailRecord> recentRecords = mailRecordRepository.findTop10ByOrderByCreatedAtDesc();
+        stats.setRecentRecords(recentRecords.stream()
+                .map(MailRecordResponse::fromEntity)
+                .collect(Collectors.toList()));
+
+        LocalDateTime sevenDaysAgo = LocalDate.now().minusDays(6).atStartOfDay();
+        List<Object[]> dailyCounts = mailRecordRepository.countDailySentSince(sevenDaysAgo);
+
+        Map<String, Long> countMap = new HashMap<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        for (Object[] row : dailyCounts) {
+            String date = row[0] != null ? row[0].toString() : "";
+            Long count = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+            countMap.put(date, count);
+        }
+
+        List<DashboardStats.DailyCount> weeklyTrend = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            String date = LocalDate.now().minusDays(i).format(formatter);
+            long count = countMap.getOrDefault(date, 0L);
+            weeklyTrend.add(new DashboardStats.DailyCount(date, count));
+        }
+        stats.setWeeklyTrend(weeklyTrend);
+
+        return stats;
     }
 }

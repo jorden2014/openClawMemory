@@ -65,9 +65,8 @@ CREATE TABLE IF NOT EXISTS mail_records (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='邮件发送记录表';
 
 -- 插入初始管理员用户（密码：admin123）
--- BCrypt加密后的密码：$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH
 INSERT INTO users (username, password, role) VALUES 
-('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', 'ADMIN')
+('admin', '$2b$10$g2rBK2onifVsN9JQTyQRxOJG2uyZdHMWdbxFTSp3U.hg5IWhTyK7S', 'ADMIN')
 ON DUPLICATE KEY UPDATE username=username;
 
 -- 插入测试客户数据
@@ -82,11 +81,6 @@ INSERT INTO mail_templates (name, subject, body, attachment_paths) VALUES
 ('欢迎邮件', '欢迎您，{{称呼}}！', '<p>尊敬的{{称呼}}：</p><p>感谢您注册我们的服务！</p><p>祝您使用愉快！</p>', NULL),
 ('促销通知', '限时优惠活动，{{称呼}}不容错过！', '<p>尊敬的{{称呼}}：</p><p>我们为您准备了限时优惠活动，欢迎参与！</p>', NULL)
 ON DUPLICATE KEY UPDATE name=name;
-
--- 创建必要的索引（如果不存在）
-CREATE INDEX IF NOT EXISTS idx_customer_email ON customers(email);
-CREATE INDEX IF NOT EXISTS idx_record_batch_status ON mail_records(batch_id, status);
-CREATE INDEX IF NOT EXISTS idx_record_customer ON mail_records(customer_id);
 
 -- 显示创建结果
 SHOW TABLES;

@@ -118,12 +118,4 @@ export interface SendParams {
   maxBatchSize: number
 }
 
-// 仪表盘统计
-export interface DashboardStats {
-  customerCount: number
-  todaySentCount: number
-  monthSentCount: number
-  failedCount: number
-  recentRecords: MailRecord[]
-  weeklyTrend: { date: string; count: number }[]
-}
+

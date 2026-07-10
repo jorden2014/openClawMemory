@@ -14,10 +14,6 @@
         active-text-color="#409EFF"
         router
       >
-        <el-menu-item index="/dashboard">
-          <el-icon><DataAnalysis /></el-icon>
-          <template #title>仪表盘</template>
-        </el-menu-item>
         <el-menu-item index="/contacts">
           <el-icon><User /></el-icon>
           <template #title>通讯录</template>
@@ -69,7 +65,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { DataAnalysis, User, Document, Promotion, List, Setting, Fold, Expand } from '@element-plus/icons-vue'
+import { User, Document, Promotion, List, Setting, Fold, Expand } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
